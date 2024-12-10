@@ -48,7 +48,9 @@ class AlbumService {
     const songResult = await this._pool.query(songQuery);
 
     if (!albumResult.rows.length) {
-      throw new NotFoundError('Failed getting album information, album not found');
+      throw new NotFoundError(
+        'Failed getting album information, album not found',
+      );
     }
 
     albumResult.rows[0].songs = songResult.rows;
@@ -81,7 +83,7 @@ class AlbumService {
 
     const result = await this._pool.query(query);
 
-    if (!result.rows.length) {
+    if (!result.rowCount) {
       throw new NotFoundError('Failed editing album, album not found');
     }
 
@@ -96,11 +98,28 @@ class AlbumService {
 
     const result = await this._pool.query(query);
 
-    if (!result.rows.length) {
+    if (!result.rowCount) {
       throw new NotFoundError('Failed deleting album, album not found');
     }
 
     return result.rows[0];
+  }
+
+  async verifyAlbumExist(albumId) {
+    const query = {
+      text: `SELECT id 
+        FROM albums
+        WHERE id = $1`,
+      values: [albumId],
+    };
+
+    const result = await this._pool.query(query);
+
+    if (!result.rowCount) {
+      throw new NotFoundError('Album not found');
+    }
+
+    return result.rows[0].id;
   }
 }
 

@@ -4,14 +4,26 @@ const { InvariantError, NotFoundError } = require('../../../utils/exceptions');
 const mapPlaylistSongActivitiesData = require('../../../utils/mappers/playlist_song_activitiesMapper');
 
 class PlaylistSongActivitiesService {
-  constructor(playlistCollaboratorService) {
+  constructor(playlistService, songService, userService, playlistCollaboratorService) {
     this._pool = pool;
+    this._playlistService = playlistService;
+    this._songService = songService;
+    this._userService = userService;
     this._playlistCollaboratorService = playlistCollaboratorService;
     this._idGenerator = new IdGenerator('playlist_song_activities');
   }
 
-  async getPlaylistSongActivities(playlistId, username, title, action, currentUser) {
-    await this._playlistCollaboratorService.verifyPlaylistAccess(playlistId, currentUser);
+  async getPlaylistSongActivities(
+    playlistId,
+    username,
+    title,
+    action,
+    currentUser,
+  ) {
+    await this._playlistCollaboratorService.verifyPlaylistAccess(
+      playlistId,
+      currentUser,
+    );
 
     const query = {
       text: `SELECT playlists.id AS "playlistId", 
@@ -51,8 +63,10 @@ class PlaylistSongActivitiesService {
 
     const result = await this._pool.query(query);
 
-    if (!result.rows.length) {
-      throw new NotFoundError('Failed getting playlist song activities, playlist not found');
+    if (!result.rowCount) {
+      throw new NotFoundError(
+        'Failed getting playlist song activities, playlist not found',
+      );
     }
 
     return result.rows.length > 0
@@ -62,6 +76,10 @@ class PlaylistSongActivitiesService {
 
   // Record activities actions based on time
   async createPlaylistSongActivites(playlistId, songId, userId, action) {
+    await this._playlistService.verifyPlaylistExist(playlistId);
+    await this._songService.verifySongExist(songId);
+    await this._userService.verifyUserExist(userId);
+
     const id = this._idGenerator.generateId();
 
     const query = {
@@ -72,18 +90,12 @@ class PlaylistSongActivitiesService {
     try {
       const result = await this._pool.query(query);
 
-      if (!result.rows.length) {
+      if (!result.rowCount) {
         throw new InvariantError('Failed creating playlist song activities');
       }
 
       return result.rows[0].id;
     } catch (err) {
-      if (err.code === '23503') {
-        throw new NotFoundError(
-          'Failed creating playlist song activities, playlist / song / user not found',
-        );
-      }
-
       if (err.code === '23505') {
         throw new InvariantError(
           `Failed creating playlist song activities, song already ${

@@ -41,7 +41,7 @@ class SongService {
 
     const result = await this._pool.query(query);
 
-    if (!result.rows.length) {
+    if (!result.rowCount) {
       throw new NotFoundError('Song not found');
     }
 
@@ -58,21 +58,13 @@ class SongService {
       values: [id, title, year, performer, genre, duration, albumId],
     };
 
-    try {
-      const result = await this._pool.query(query);
+    const result = await this._pool.query(query);
 
-      if (!result.rows[0].id) {
-        throw new InvariantError('Failed to create song');
-      }
-
-      return result.rows[0].id;
-    } catch (err) {
-      if (err.code === '23503') {
-        throw new NotFoundError('Failed to create song, album not found');
-      }
-
-      throw err;
+    if (!result.rows[0].id) {
+      throw new InvariantError('Failed to create song');
     }
+
+    return result.rows[0].id;
   }
 
   async editSongById(id, {
@@ -85,7 +77,7 @@ class SongService {
 
     const result = await this._pool.query(query);
 
-    if (!result.rows.length) {
+    if (!result.rowCount) {
       throw new NotFoundError('Failed to edit song, song not found');
     }
 
@@ -100,11 +92,28 @@ class SongService {
 
     const result = await this._pool.query(query);
 
-    if (!result.rows.length) {
+    if (!result.rowCount) {
       throw new NotFoundError('Failed to delete song, song not found');
     }
 
     return result.rows[0];
+  }
+
+  async verifySongExist(songId) {
+    const query = {
+      text: `SELECT id 
+        FROM songs
+        WHERE id = $1`,
+      values: [songId],
+    };
+
+    const result = await this._pool.query(query);
+
+    if (!result.rowCount) {
+      throw new NotFoundError('Song not found');
+    }
+
+    return result.rows[0].id;
   }
 }
 

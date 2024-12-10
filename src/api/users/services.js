@@ -27,7 +27,7 @@ class UserService {
 
     const result = await this._pool.query(query);
 
-    if (!result.rows.length) {
+    if (!result.rowCount) {
       throw new InvariantError('Failed adding user');
     }
 
@@ -42,8 +42,10 @@ class UserService {
 
     const result = await this._pool.query(query);
 
-    if (!result.rows.length) {
-      throw new NotFoundError('Failed getting user information, user not found');
+    if (!result.rowCount) {
+      throw new NotFoundError(
+        'Failed getting user information, user not found',
+      );
     }
 
     return result.rows[0];
@@ -57,7 +59,7 @@ class UserService {
 
     const result = await this._pool.query(query);
 
-    if (!result.rows.length) {
+    if (!result.rowCount) {
       throw new AuthenticationError('Failed to logged in, invalid credential');
     }
 
@@ -87,6 +89,23 @@ class UserService {
     }
 
     return result.rows[0];
+  }
+
+  async verifyUserExist(userId) {
+    const query = {
+      text: `SELECT id 
+        FROM users
+        WHERE id = $1`,
+      values: [userId],
+    };
+
+    const result = await this._pool.query(query);
+
+    if (!result.rowCount) {
+      throw new NotFoundError('User not found');
+    }
+
+    return result.rows[0].id;
   }
 }
 

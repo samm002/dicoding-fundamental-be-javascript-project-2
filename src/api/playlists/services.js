@@ -1,10 +1,15 @@
 const pool = require('../../configs/database');
 const IdGenerator = require('../../utils/generateId');
-const { InvariantError, NotFoundError, AuthorizationError } = require('../../utils/exceptions');
+const {
+  InvariantError,
+  NotFoundError,
+  AuthorizationError,
+} = require('../../utils/exceptions');
 
 class PlaylistService {
-  constructor() {
+  constructor(userService) {
     this._pool = pool;
+    this._userService = userService;
     this._idGenerator = new IdGenerator('playlist');
   }
 
@@ -29,6 +34,8 @@ class PlaylistService {
   }
 
   async createPlaylist(owner, name) {
+    await this._userService.verifyUserExist(owner);
+
     const id = this._idGenerator.generateId();
 
     const query = {
@@ -36,21 +43,13 @@ class PlaylistService {
       values: [id, name, owner],
     };
 
-    try {
-      const result = await this._pool.query(query);
+    const result = await this._pool.query(query);
 
-      if (!result.rows[0].id) {
-        throw new InvariantError('Failed creating playlist');
-      }
-
-      return result.rows[0].id;
-    } catch (err) {
-      if (err.code === '23503') {
-        throw new NotFoundError('Failed creating playlist, invalid user (user not found)');
-      }
-
-      throw err;
+    if (!result.rows[0].id) {
+      throw new InvariantError('Failed creating playlist');
     }
+
+    return result.rows[0].id;
   }
 
   async deletePlaylistById(id, userId) {
@@ -62,7 +61,7 @@ class PlaylistService {
 
     const result = await this._pool.query(query);
 
-    if (!result.rows.length) {
+    if (!result.rowCount) {
       throw new InvariantError('Failed deleting playlist');
     }
 
@@ -77,17 +76,38 @@ class PlaylistService {
 
     const result = await this._pool.query(query);
 
-    if (!result.rows.length) {
-      throw new NotFoundError('Failed verifying playlist owner, playlist not found');
+    if (!result.rowCount) {
+      throw new NotFoundError(
+        'Failed verifying playlist owner, playlist not found',
+      );
     }
 
     const playlist = result.rows[0];
 
     if (playlist.owner !== userId) {
-      throw new AuthorizationError('Forbidden access you are not playlist owner');
+      throw new AuthorizationError(
+        'Forbidden access you are not playlist owner',
+      );
     }
 
     return playlist.owner;
+  }
+
+  async verifyPlaylistExist(playlistId) {
+    const query = {
+      text: `SELECT id 
+        FROM playlists
+        WHERE id = $1`,
+      values: [playlistId],
+    };
+
+    const result = await this._pool.query(query);
+
+    if (!result.rowCount) {
+      throw new NotFoundError('Playlist not found');
+    }
+
+    return result.rows[0].id;
   }
 }
 

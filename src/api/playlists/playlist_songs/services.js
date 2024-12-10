@@ -4,8 +4,17 @@ const IdGenerator = require('../../../utils/generateId');
 const mapPlaylistSongsData = require('../../../utils/mappers/playlist_songsMapper');
 
 class PlaylistSongService {
-  constructor(playlistCollaboratorService, playlistSongActivitiesService) {
+  constructor(
+    playlistService,
+    songService,
+    userService,
+    playlistCollaboratorService,
+    playlistSongActivitiesService,
+  ) {
     this._pool = pool;
+    this._playlistService = playlistService;
+    this._songService = songService;
+    this._userService = userService;
     this._playlistCollaboratorService = playlistCollaboratorService;
     this._playlistSongActivitiesService = playlistSongActivitiesService;
     this._idGenerator = new IdGenerator('playlist_song');
@@ -40,6 +49,10 @@ class PlaylistSongService {
 
   // Add song to a playlist (creating junction table records)
   async createPlaylistSong(playlistId, songId, userId) {
+    await this._playlistService.verifyPlaylistExist(playlistId);
+    await this._songService.verifySongExist(songId);
+    await this._userService.verifyUserExist(userId);
+
     await this._playlistCollaboratorService.verifyPlaylistAccess(
       playlistId,
       userId,
@@ -59,7 +72,7 @@ class PlaylistSongService {
 
       const result = await this._pool.query(query);
 
-      if (!result.rows.length) {
+      if (!result.rowCount) {
         throw new InvariantError('Failed adding song to playlist');
       }
 
@@ -75,10 +88,6 @@ class PlaylistSongService {
       return result.rows[0].id;
     } catch (err) {
       await client.query('ROLLBACK');
-
-      if (err.code === '23503') {
-        throw new NotFoundError('Failed adding song to playlist, playlist or user not found');
-      }
 
       if (err.code === '23505') {
         throw new InvariantError(
@@ -110,8 +119,10 @@ class PlaylistSongService {
 
       const result = await this._pool.query(query);
 
-      if (!result.rows.length) {
-        throw new NotFoundError('Failed deleting song from playlist, playlist or song not found');
+      if (!result.rowCount) {
+        throw new NotFoundError(
+          'Failed deleting song from playlist, playlist or song not found',
+        );
       }
 
       await this._playlistSongActivitiesService.createPlaylistSongActivites(

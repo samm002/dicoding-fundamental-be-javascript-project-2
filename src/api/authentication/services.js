@@ -19,8 +19,10 @@ class AuthenticationService {
 
     const result = await this._pool.query(query);
 
-    if (!result.rows.length) {
-      throw new InvariantError('Failed verifying refresh token, user not found');
+    if (!result.rowCount) {
+      throw new InvariantError(
+        'Failed verifying refresh token, user not found',
+      );
     }
   }
 
@@ -43,7 +45,7 @@ class AuthenticationService {
 
     const result = await this._pool.query(query);
 
-    if (!result.rows.length) {
+    if (!result.rowCount) {
       throw new InvariantError('Failed deleting refresh token, user not found');
     }
   }
